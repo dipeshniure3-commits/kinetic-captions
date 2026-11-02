@@ -39,6 +39,15 @@ COLOR_NAMES = {"black": "#000000", "white": "#FFFFFF"}
 Progress = Callable[[str, float, str], None]   # (stage, fraction 0..1 overall, message)
 
 
+class PipelineError(ValueError):
+    """ValueError with a stable `code` so the UI can localise the message."""
+
+    def __init__(self, msg: str, code: str):
+        super().__init__(msg)
+        self.code = code
+        self.params: dict = {}
+
+
 def _noop(stage: str, frac: float, msg: str) -> None:
     pass
 
@@ -61,7 +70,7 @@ def probe_kind(path: str) -> dict:
                 "duration": dur, "has_audio": bool(auds)}
     if auds:
         return {"kind": "audio", "width": 0, "height": 0, "duration": dur, "has_audio": True}
-    raise ValueError("音声も映像も見つかりませんでした")
+    raise PipelineError("音声も映像も見つかりませんでした", "no_streams")
 
 
 def _hex(c: str | None, default: str) -> str:
@@ -126,7 +135,7 @@ def run_job(input_path: str, out_path: str, opts: dict | None = None,
     cb = progress or _noop
     info = probe_kind(input_path)
     if not info["has_audio"]:
-        raise ValueError("音声トラックがありません（文字おこしできません）")
+        raise PipelineError("音声トラックがありません（文字おこしできません）", "no_audio")
 
     # cache dir keyed on file content so re-runs with new settings are instant
     h = hashlib.sha1()

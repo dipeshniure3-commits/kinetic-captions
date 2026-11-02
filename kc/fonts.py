@@ -42,7 +42,12 @@ _lock = threading.Lock()
 
 
 class FontError(ValueError):
-    pass
+    """`code` (+ `params`) is a stable id so the UI can show the message in any language."""
+
+    def __init__(self, msg: str, code: str = "font_error", **params):
+        super().__init__(msg)
+        self.code = code
+        self.params = params
 
 
 def _load_user() -> list[dict]:
@@ -73,7 +78,7 @@ def font_path(font_id: str) -> Path | None:
 def parse_family(query: str) -> str:
     q = (query or "").strip()
     if not q:
-        raise FontError("フォント名かURLを入れてください")
+        raise FontError("フォント名かURLを入れてください", "font_empty")
     m = re.search(r"fonts\.google\.com/specimen/([^?#\s\"'/]+)", q)
     if m:
         return urllib.parse.unquote_plus(m.group(1)).strip()
@@ -88,14 +93,14 @@ def parse_family(query: str) -> str:
 
 def _valid_name(name: str) -> str:
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 \-]{0,60}", name):
-        raise FontError(f"「{name}」はフォント名として読み取れませんでした")
+        raise FontError(f"「{name}」はフォント名として読み取れませんでした", "font_bad_name", name=name)
     return re.sub(r"\s+", " ", name)
 
 
 def _get(url: str, timeout: int = 30) -> bytes:
     host = urllib.parse.urlparse(url).hostname or ""
     if host not in _ALLOWED_HOSTS:
-        raise FontError("Google Fonts 以外からはダウンロードしません")
+        raise FontError("Google Fonts 以外からはダウンロードしません", "font_host")
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return r.read()
@@ -127,7 +132,8 @@ def _ttf_url(name: str) -> tuple[str, str]:
         if m:
             wm = re.search(r"font-weight:\s*(\d+)", css)
             return m.group(1), (wm.group(1) if wm else (w or "400"))
-    raise FontError(f"Google Fonts に「{name}」が見つかりませんでした（スペルを確認してください）")
+    raise FontError(f"Google Fonts に「{name}」が見つかりませんでした（スペルを確認してください）",
+                    "font_not_found", name=name)
 
 
 def add_google_font(query: str) -> dict:
@@ -142,7 +148,7 @@ def add_google_font(query: str) -> dict:
     url, weight = _ttf_url(name)
     data = _get(url, 60)
     if data[:4] not in (b"\x00\x01\x00\x00", b"true", b"OTTO"):
-        raise FontError("フォントファイルを取得できませんでした")
+        raise FontError("フォントファイルを取得できませんでした", "font_fetch_failed")
     USER_DIR.mkdir(parents=True, exist_ok=True)
     fname = f"{fid}-{weight}.ttf"
     (USER_DIR / fname).write_bytes(data)

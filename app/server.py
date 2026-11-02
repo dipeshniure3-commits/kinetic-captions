@@ -12,6 +12,9 @@ Endpoints
     GET  /api/fonts           caption fonts available for preview
     GET  /media/<file>        rendered outputs (HTTP Range supported)
     GET  /fonts/<file>        assets/fonts (for @font-face previews)
+
+Errors are JSON {"error", "code", "error_i18n": {"ja", "en"}}; send `X-Lang: ja|en`
+to choose the language of "error" (default ja).
 """
 from __future__ import annotations
 
@@ -69,6 +72,70 @@ OPT_CHOICES = {
 }
 HEX = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
+# ------------------------------------------------------------------ i18n
+# Client sends `X-Lang: ja|en`; every user-facing message is looked up here.
+LANGS = ("ja", "en")
+DEFAULT_LANG = "ja"
+MESSAGES: dict[str, dict[str, str]] = {
+    "not_found": {"ja": "見つかりません", "en": "Not found."},
+    "file_missing": {"ja": "ファイルが見つかりません", "en": "File not found."},
+    "video_missing": {"ja": "動画が見つかりません", "en": "Video not found."},
+    "font_missing": {"ja": "フォントが見つかりません", "en": "Font not found."},
+    "job_missing": {"ja": "ジョブが見つかりません", "en": "Job not found."},
+    "unsupported_type": {
+        "ja": "このファイル形式には対応していません。音声（mp3 / wav / m4a / aac）か動画（mp4 / mov / webm）を選んでください。",
+        "en": "This file type isn't supported. Choose audio (mp3 / wav / m4a / aac) or video (mp4 / mov / webm)."},
+    "empty_file": {"ja": "ファイルが空です。", "en": "The file is empty."},
+    "too_large": {"ja": "ファイルが大きすぎます（4GBまで）。", "en": "The file is too large (4 GB max)."},
+    "upload_interrupted": {"ja": "アップロードが途中で止まりました。もう一度お試しください。",
+                           "en": "The upload stopped partway. Please try again."},
+    "unreadable": {"ja": "ファイルを読み込めませんでした。壊れているか、対応していない形式です。",
+                   "en": "Couldn't read the file. It may be damaged or in an unsupported format."},
+    "no_audio_upload": {"ja": "音声が入っていないため、文字おこしができません。音声つきのファイルを選んでください。",
+                        "en": "This file has no sound, so it can't be transcribed. Choose a file with audio."},
+    "input_too_long": {"ja": "入力が長すぎます。", "en": "The input is too long."},
+    "bad_request": {"ja": "リクエストが正しくありません。", "en": "Invalid request."},
+    "fonts_offline": {"ja": "Google Fonts に接続できませんでした。ネット接続を確認してください。",
+                      "en": "Couldn't reach Google Fonts. Check your internet connection."},
+    "upload_again": {"ja": "ファイルが見つかりません。もう一度アップロードしてください。",
+                     "en": "File not found. Please upload it again."},
+    # job failures
+    "ffmpeg_failed": {"ja": "動画の変換（ffmpeg）に失敗しました。別のファイルでお試しください。",
+                      "en": "Video conversion (ffmpeg) failed. Please try a different file."},
+    "missing_tool": {"ja": "必要なファイルやツールが見つかりませんでした。",
+                     "en": "A required file or tool could not be found."},
+    "out_of_memory": {"ja": "メモリが足りません。精度を「速い」にして、もう一度お試しください。",
+                      "en": "Not enough memory. Set Accuracy to \"Fast\" and try again."},
+    "job_failed": {"ja": "処理中にエラーが発生しました。設定を変えるか、もう一度お試しください。",
+                   "en": "Something went wrong while processing. Change the settings or try again."},
+    # codes raised by kc.pipeline (PipelineError) and kc.fonts (FontError)
+    "no_streams": {"ja": "音声も映像も見つかりませんでした", "en": "No audio or video was found in this file."},
+    "no_audio": {"ja": "音声トラックがありません（文字おこしできません）",
+                 "en": "There's no audio track, so it can't be transcribed."},
+    "font_empty": {"ja": "フォント名かURLを入れてください", "en": "Enter a font name or URL."},
+    "font_bad_name": {"ja": "「{name}」はフォント名として読み取れませんでした",
+                      "en": "Couldn't read \"{name}\" as a font name."},
+    "font_host": {"ja": "Google Fonts 以外からはダウンロードしません",
+                  "en": "Fonts can only be downloaded from Google Fonts."},
+    "font_not_found": {"ja": "Google Fonts に「{name}」が見つかりませんでした（スペルを確認してください）",
+                       "en": "\"{name}\" wasn't found on Google Fonts (check the spelling)."},
+    "font_fetch_failed": {"ja": "フォントファイルを取得できませんでした", "en": "Couldn't download the font file."},
+}
+
+
+def tr(code: str, lang: str, **params) -> str:
+    entry = MESSAGES.get(code) or MESSAGES["job_failed"]
+    text = entry.get(lang) or entry[DEFAULT_LANG]
+    try:
+        return text.format(**params)
+    except (KeyError, IndexError, ValueError):
+        return text
+
+
+def tr_all(code: str, **params) -> dict[str, str]:
+    """Every language at once, so the UI can switch language without refetching."""
+    return {lg: tr(code, lg, **params) for lg in LANGS}
+
 
 # ------------------------------------------------------------------ jobs
 class Job:
@@ -81,8 +148,8 @@ class Job:
         self.state = "queued"          # queued | running | done | error
         self.stage = "queued"
         self.frac = 0.0
-        self.msg = "順番待ちです"
-        self.error = None
+        self.msg = "順番待ちです"     # informational only; the UI renders progress text from `stage`
+        self.error = None              # (code, params) -> localised in to_dict()
         self.detail = None
         self.result = None
         self.created = time.time()
@@ -94,7 +161,7 @@ class Job:
             self.frac = max(self.frac, min(1.0, float(frac)))
             self.msg = msg
 
-    def to_dict(self) -> dict:
+    def to_dict(self, lang: str = DEFAULT_LANG) -> dict:
         with self.lock:
             st = self.stage
             step = self.stages.index(st) + 1 if st in self.stages else (
@@ -107,7 +174,11 @@ class Job:
                 "id": self.id, "state": self.state, "kind": self.kind,
                 "stage": st, "stages": self.stages, "step": step,
                 "total": len(self.stages), "frac": round(self.frac, 4),
-                "msg": self.msg, "error": self.error, "detail": self.detail,
+                "msg": self.msg,
+                "error": tr(self.error[0], lang, **self.error[1]) if self.error else None,
+                "error_code": self.error[0] if self.error else None,
+                "error_i18n": tr_all(self.error[0], **self.error[1]) if self.error else None,
+                "detail": self.detail,
                 "result": self.result, "queue_ahead": ahead,
             }
 
@@ -118,18 +189,19 @@ JOB_QUEUE: "queue.Queue[Job]" = queue.Queue()
 FILES: dict[str, dict] = {}        # file_id -> info (also persisted next to upload)
 
 
-def _friendly_error(e: BaseException) -> tuple[str, str]:
+def _friendly_error(e: BaseException) -> tuple[tuple[str, dict], str]:
+    """-> ((message code, params), technical detail)."""
     detail = f"{type(e).__name__}: {e}"
-    msg = str(e)
-    if re.search(r"[぀-ヿ一-鿿]", msg):   # already Japanese (from pipeline)
-        return msg, detail
+    code = getattr(e, "code", None)
+    if isinstance(code, str) and code in MESSAGES:   # PipelineError / FontError from kc
+        return (code, dict(getattr(e, "params", None) or {})), detail
     if isinstance(e, subprocess.CalledProcessError):
-        return "動画の変換（ffmpeg）に失敗しました。別のファイルでお試しください。", detail
+        return ("ffmpeg_failed", {}), detail
     if isinstance(e, FileNotFoundError):
-        return "必要なファイルやツールが見つかりませんでした。", detail
+        return ("missing_tool", {}), detail
     if isinstance(e, MemoryError):
-        return "メモリが足りません。精度を「速い」にして、もう一度お試しください。", detail
-    return "処理中にエラーが発生しました。設定を変えるか、もう一度お試しください。", detail
+        return ("out_of_memory", {}), detail
+    return ("job_failed", {}), detail
 
 
 def _worker() -> None:
@@ -155,12 +227,12 @@ def _worker() -> None:
                 job.msg = "完成しました"
         except BaseException as e:  # noqa: BLE001 - surface every failure to the UI
             traceback.print_exc()
-            msg, detail = _friendly_error(e)
+            err, detail = _friendly_error(e)
             with job.lock:
                 job.state = "error"
-                job.error = msg
+                job.error = err
                 job.detail = detail
-                job.msg = msg
+                job.msg = tr(err[0], DEFAULT_LANG, **err[1])
             try:
                 if out_path.exists():
                     out_path.unlink()
@@ -221,15 +293,21 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _err(self, status: int, msg: str) -> None:
-        self._json({"error": msg}, status)
+    @property
+    def lang(self) -> str:
+        lg = (self.headers.get("X-Lang") or "").strip().lower()[:2]
+        return lg if lg in LANGS else DEFAULT_LANG
+
+    def _err(self, status: int, code: str, **params) -> None:
+        self._json({"error": tr(code, self.lang, **params), "code": code,
+                    "error_i18n": tr_all(code, **params)}, status)
 
     def _file(self, path: Path, cache: str = "no-cache") -> None:
         """Serve a file with single-range support (needed for <video> seeking)."""
         try:
             size = path.stat().st_size
         except OSError:
-            return self._err(404, "ファイルが見つかりません")
+            return self._err(404, "file_missing")
         ctype = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
         if path.suffix == ".ttf":
             ctype = "font/ttf"
@@ -304,13 +382,13 @@ class Handler(BaseHTTPRequestHandler):
             return self._file(STATIC / "index.html")
         if path.startswith("/static/"):
             p = self._safe(STATIC, path[len("/static/"):])
-            return self._file(p) if p else self._err(404, "見つかりません")
+            return self._file(p) if p else self._err(404, "not_found")
         if path.startswith("/media/"):
             p = self._safe(OUTPUTS, path[len("/media/"):])
-            return self._file(p) if p else self._err(404, "動画が見つかりません")
+            return self._file(p) if p else self._err(404, "video_missing")
         if path.startswith("/fonts/"):
             p = self._safe(FONTS, path[len("/fonts/"):])
-            return self._file(p, "public, max-age=86400") if p else self._err(404, "フォントが見つかりません")
+            return self._file(p, "public, max-age=86400") if p else self._err(404, "font_missing")
         if path == "/api/fonts":
             fonts = [{**f, "url": "/fonts/" + f["file"].replace("[", "%5B").replace("]", "%5D")}
                      for f in kcfonts.list_fonts()]
@@ -318,7 +396,7 @@ class Handler(BaseHTTPRequestHandler):
         m = re.match(r"^/api/job/([0-9a-f]+)$", path)
         if m:
             job = JOBS.get(m.group(1))
-            return self._json(job.to_dict()) if job else self._err(404, "ジョブが見つかりません")
+            return self._json(job.to_dict(self.lang)) if job else self._err(404, "job_missing")
         if path == "/api/health":
             return self._json({"ok": True})
         if path == "/favicon.ico":
@@ -326,7 +404,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
-        self._err(404, "見つかりません")
+        self._err(404, "not_found")
 
     def do_POST(self) -> None:
         path = urlparse(self.path).path
@@ -336,7 +414,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._create_job()
         if path == "/api/fonts/add":
             return self._add_font()
-        self._err(404, "見つかりません")
+        self._err(404, "not_found")
 
     def _upload(self) -> None:
         name = unquote(self.headers.get("X-Filename") or "").strip()
@@ -348,13 +426,12 @@ class Handler(BaseHTTPRequestHandler):
             length = 0
         if ext not in AUDIO_EXT | VIDEO_EXT:
             self._drain(length)
-            return self._err(415, "このファイル形式には対応していません。"
-                                  "音声（mp3 / wav / m4a / aac）か動画（mp4 / mov / webm）を選んでください。")
+            return self._err(415, "unsupported_type")
         if length <= 0:
-            return self._err(411, "ファイルが空です。")
+            return self._err(411, "empty_file")
         if length > MAX_UPLOAD:
             self._drain(length)
-            return self._err(413, "ファイルが大きすぎます（4GBまで）。")
+            return self._err(413, "too_large")
         UPLOADS.mkdir(parents=True, exist_ok=True)
         fid = uuid.uuid4().hex[:12]
         safe = re.sub(r"[^\w.\-]+", "_", name)[-80:]
@@ -370,17 +447,16 @@ class Handler(BaseHTTPRequestHandler):
                     left -= len(buf)
         except (ConnectionError, OSError):
             dest.unlink(missing_ok=True)
-            return self._err(400, "アップロードが途中で止まりました。もう一度お試しください。")
+            return self._err(400, "upload_interrupted")
         try:
             info = probe_kind(str(dest))
         except Exception as e:  # noqa: BLE001
             dest.unlink(missing_ok=True)
-            msg = str(e) if re.search(r"[぀-ヿ]", str(e)) else \
-                "ファイルを読み込めませんでした。壊れているか、対応していない形式です。"
-            return self._err(422, msg)
+            code = getattr(e, "code", None)
+            return self._err(422, code if code in MESSAGES else "unreadable")
         if not info.get("has_audio"):
             dest.unlink(missing_ok=True)
-            return self._err(422, "音声が入っていないため、文字おこしができません。音声つきのファイルを選んでください。")
+            return self._err(422, "no_audio_upload")
         rec = {"file_id": fid, "name": name, "path": str(dest), "size": length, **info}
         FILES[fid] = rec
         self._json({k: v for k, v in rec.items() if k != "path"})
@@ -397,16 +473,19 @@ class Handler(BaseHTTPRequestHandler):
         try:
             length = int(self.headers.get("Content-Length") or 0)
             if length > 20000:
-                return self._err(413, "入力が長すぎます。")
+                return self._err(413, "input_too_long")
             body = json.loads(self.rfile.read(length) or b"{}")
         except (ValueError, json.JSONDecodeError):
-            return self._err(400, "リクエストが正しくありません。")
+            return self._err(400, "bad_request")
         try:
             f = kcfonts.add_google_font(str(body.get("query", "")))
         except kcfonts.FontError as e:
-            return self._err(400, str(e))
+            code = getattr(e, "code", "")
+            if code not in MESSAGES:
+                return self._json({"error": str(e)}, 400)
+            return self._err(400, code, **getattr(e, "params", {}))
         except Exception:
-            return self._err(502, "Google Fonts に接続できませんでした。ネット接続を確認してください。")
+            return self._err(502, "fonts_offline")
         url = "/fonts/" + f["file"].replace("[", "%5B").replace("]", "%5D")
         return self._json({"font": {**f, "url": url}})
 
@@ -415,15 +494,15 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length") or 0)
             body = json.loads(self.rfile.read(length) or b"{}")
         except (ValueError, json.JSONDecodeError):
-            return self._err(400, "リクエストが正しくありません。")
+            return self._err(400, "bad_request")
         f = FILES.get(str(body.get("file_id", "")))
         if not f or not os.path.exists(f["path"]):
-            return self._err(404, "ファイルが見つかりません。もう一度アップロードしてください。")
+            return self._err(404, "upload_again")
         job = Job(f, _clean_opts(body.get("opts") or {}, f["kind"]))
         JOBS[job.id] = job
         JOB_ORDER.append(job)
         JOB_QUEUE.put(job)
-        self._json(job.to_dict(), 201)
+        self._json(job.to_dict(self.lang), 201)
 
 
 def main(argv: list[str] | None = None) -> None:

@@ -48,7 +48,17 @@ p { margin: 0; }
 label:has(> input:focus-visible) { outline: 2px solid var(--color-ring); outline-offset: 2px; }
 
 /* ---------- header ---------- */
-.top { max-width: 1280px; margin: 0 auto; padding: var(--space-lg) var(--space-lg) var(--space-md); }
+.top { max-width: 1280px; margin: 0 auto; padding: var(--space-lg) var(--space-lg) var(--space-md); display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); flex-wrap: wrap; }
+
+/* language toggle: segmented control (same look as .seg) */
+.lang-switch { display: inline-flex; gap: var(--space-xs); padding: var(--space-xs); background: var(--color-card); border: 1px solid var(--color-border); border-radius: var(--radius-sm); flex: none; }
+.lang-btn {
+  min-height: 44px; min-width: 44px; padding: 6px 14px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--color-muted-foreground); font: 500 14px/1.2 var(--font-ui); cursor: pointer;
+  transition: background var(--t), color var(--t);
+}
+.lang-btn:hover { color: var(--color-foreground); }
+.lang-btn[aria-pressed="true"] { background: var(--color-elevated); color: var(--color-foreground); font-weight: 600; box-shadow: 0 0 0 1px #52525b inset; }
 .brand { display: flex; align-items: center; gap: var(--space-md); }
 .logo { display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--radius); background: var(--color-elevated); color: var(--color-accent); border: 1px solid var(--color-border); }
 h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; }
