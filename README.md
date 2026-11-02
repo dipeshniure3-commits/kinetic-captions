@@ -4,6 +4,28 @@
 
 *Drop in audio or video → get a captioned video with per-word kinetic typography (big words tucked behind the speaker, auto placement around the subject). Local web UI, runs fully offline after the first model download.*
 
+## デモ
+
+<p align="center">
+  <img src="docs/demo.gif" alt="同じ音声から3つのスタイルで作った字幕動画（左：モチバーシティ／中央：ホルモジ＋Bangers／右：Courgette筆記体）" width="760">
+</p>
+
+同じ音声ファイル1つから、スタイルとフォントだけ変えて作った例です（左から モチバーシティ / ホルモジ＋Bangers / Courgette 筆記体）。強い言葉（EXCUSES, PERFECT, EXIST…）は自動で大きく・光って表示されます。
+
+▶ **音声付きの動画**：[docs/demo_motiversity.mp4](docs/demo_motiversity.mp4)
+
+<p align="center">
+  <img src="docs/styles.png" alt="3つのスタイルの静止画" width="620">
+</p>
+
+### 画面（Web UI）
+
+<p align="center">
+  <img src="docs/ui.png" alt="Kinetic Captions のWeb UI。左にファイルのドロップ欄、右にスタイルとフォントの選択" width="760">
+</p>
+
+ファイルをドロップして、ボタンを押すだけ。スタイル・フォント（Google Fonts から追加も可）・色・サイズ・背景は画面から選べます。
+
 ## できること
 
 - **文字おこし**：faster-whisper で単語ごとの時刻を取得し、声の大きさ・高さも分析

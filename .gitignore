@@ -23,3 +23,6 @@ samples/
 
 # fonts users add from Google Fonts at runtime
 assets/fonts/user/
+
+# README demo media (original renders, no third-party footage)
+!docs/*.mp4
