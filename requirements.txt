@@ -1,0 +1,15 @@
+# Python 3.11+. ffmpeg / ffprobe must be on PATH (brew install ffmpeg).
+faster-whisper>=1.2
+rembg[cpu]>=2.0.86
+onnxruntime>=1.20
+pillow>=11
+numpy>=2
+scipy>=1.13
+
+# macOS only: Apple Vision person segmentation (~25x faster than ISNet).
+# Without these the tool falls back to ISNet automatically.
+pyobjc-framework-Vision>=10; sys_platform == "darwin"
+pyobjc-framework-Quartz>=10; sys_platform == "darwin"
+
+# Only needed for the scripts in bench/
+# onnx>=1.16

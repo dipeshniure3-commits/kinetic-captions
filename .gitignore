@@ -1,0 +1,25 @@
+# environments
+.venv/
+.venv-tts/
+__pycache__/
+*.pyc
+.DS_Store
+
+# caches / generated
+work/
+app/uploads/
+app/outputs/
+*.mp4
+*.mov
+*.webm
+*.mp3
+*.wav
+*.m4a
+*.aac
+*.aiff
+
+# test media (may be copyrighted or personal) — never commit
+samples/
+
+# fonts users add from Google Fonts at runtime
+assets/fonts/user/

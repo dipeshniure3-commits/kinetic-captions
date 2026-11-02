@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Kinetic Captions — 字幕動画をかんたんに</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<!-- Inline SVG icon sprite (Lucide-style, 1.75 stroke) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></symbol>
+    <symbol id="i-audio" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+    <symbol id="i-film" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="2.5"/><path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+    <symbol id="i-wand" viewBox="0 0 24 24"><path d="m15 4-1 3M19 8l3-1M17.8 6.2 20 4M6 20 17 9M14 6l4 4"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+  </defs>
+</svg>
+
+<a class="skip" href="#settings">設定へスキップ</a>
+
+<header class="top">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"><svg class="ic"><use href="#i-wand"/></svg></span>
+    <div>
+      <h1>Kinetic Captions</h1>
+      <p class="tagline">音声か動画を入れるだけで、プロっぽい字幕動画に</p>
+    </div>
+  </div>
+</header>
+
+<main class="layout">
+  <!-- ============ LEFT: file → progress → result ============ -->
+  <section class="stage-col" aria-label="ファイルとプレビュー">
+    <div class="sticky">
+
+      <!-- ① drop zone -->
+      <button type="button" id="drop" class="drop" aria-describedby="drop-hint">
+        <span class="drop-icon" aria-hidden="true"><svg class="ic lg"><use href="#i-upload"/></svg></span>
+        <span class="drop-title">ここにファイルをドロップ</span>
+        <span class="drop-sub">またはクリックして選ぶ</span>
+        <span id="drop-hint" class="drop-hint">音声（mp3・wav・m4a・aac）／動画（mp4・mov・webm）</span>
+        <span class="up-progress" id="up-progress" hidden>
+          <span class="bar"><span class="fill" id="up-fill"></span></span>
+          <span class="up-text" id="up-text">アップロード中…</span>
+        </span>
+      </button>
+      <input type="file" id="file" accept=".mp3,.wav,.m4a,.aac,.mp4,.mov,.webm,audio/*,video/*" hidden>
+
+      <!-- ② file card -->
+      <div id="file-card" class="card file-card" hidden>
+        <div class="file-row">
+          <span class="file-icon" aria-hidden="true"><svg class="ic"><use id="file-icon-use" href="#i-audio"/></svg></span>
+          <div class="file-meta">
+            <p class="file-name" id="file-name"></p>
+            <p class="file-sub" id="file-sub"></p>
+          </div>
+          <button type="button" class="btn ghost sm" id="change-file">
+            <svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg><span>別のファイル</span>
+          </button>
+        </div>
+        <p class="badge" id="kind-badge"></p>
+      </div>
+
+      <!-- error -->
+      <div id="error" class="alert" role="alert" hidden>
+        <svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>
+        <div>
+          <p class="alert-title" id="error-msg"></p>
+          <p class="alert-sub" id="error-hint"></p>
+          <details class="alert-detail" id="error-detail-wrap" hidden><summary>詳しい情報</summary><code id="error-detail"></code></details>
+        </div>
+        <button type="button" class="icon-btn" id="error-close" aria-label="エラーを閉じる"><svg class="ic"><use href="#i-x"/></svg></button>
+      </div>
+
+      <!-- ③ progress -->
+      <div id="progress" class="card progress" hidden>
+        <div class="progress-head">
+          <p class="progress-title"><span class="spinner" aria-hidden="true"></span><span id="step-label">Step 1 / 5</span></p>
+          <p class="elapsed" id="elapsed">0:00</p>
+        </div>
+        <ol class="stepper" id="stepper"></ol>
+        <div class="bar big" role="progressbar" aria-label="全体の進み具合" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="bar">
+          <span class="fill" id="bar-fill"></span>
+        </div>
+        <p class="progress-msg" id="progress-msg" aria-live="polite">準備しています</p>
+      </div>
+
+      <!-- preview / ④ result -->
+      <div id="preview" class="card preview" hidden>
+        <div class="player-wrap" id="player-wrap">
+          <video id="player" controls playsinline preload="metadata"></video>
+          <div class="placeholder" id="placeholder" aria-hidden="true">
+            <span class="ph-text" id="ph-text">NEVER GIVE UP</span>
+          </div>
+        </div>
+        <div id="result-actions" class="result-actions" hidden>
+          <p class="done-badge"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>完成しました</p>
+          <div class="btn-row">
+            <a class="btn primary" id="download" href="#" download>
+              <svg class="ic" aria-hidden="true"><use href="#i-download"/></svg><span>ダウンロード</span>
+            </a>
+            <button type="button" class="btn ghost" id="redo">
+              <svg class="ic" aria-hidden="true"><use href="#i-sliders"/></svg><span>設定を変えて作り直す</span>
+            </button>
+          </div>
+          <details class="transcript" id="transcript-wrap">
+            <summary><span>文字おこし</span><svg class="ic chev" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+            <div class="transcript-body">
+              <p id="transcript"></p>
+              <button type="button" class="btn ghost sm" id="copy">
+                <svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg><span id="copy-label">コピー</span>
+              </button>
+            </div>
+          </details>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ RIGHT: settings ============ -->
+  <section class="settings-col" id="settings" aria-label="設定" tabindex="-1">
+    <form id="form" class="card settings" novalidate>
+
+      <fieldset class="group">
+        <legend class="g-title">スタイル</legend>
+        <div class="styles" role="radiogroup" aria-label="スタイル">
+          <label class="style-card">
+            <input type="radio" name="preset" value="motiversity" checked>
+            <span class="mock mock-moti" aria-hidden="true">
+              <span class="m-word">GIVE</span><span class="m-person"><span class="m-head"></span><span class="m-body"></span></span>
+            </span>
+            <span class="sc-text"><span class="sc-name">モチバーシティ</span><span class="sc-desc">白・極太・頭の後ろに回り込む</span></span>
+            <span class="sc-check" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+          </label>
+          <label class="style-card">
+            <input type="radio" name="preset" value="hormozi">
+            <span class="mock mock-horm" aria-hidden="true">
+              <span class="m-person dim"><span class="m-head"></span><span class="m-body"></span></span>
+              <span class="m-lines"><span>NEVER <b class="y">GIVE</b></span><span><b class="g">UP</b> TODAY</span></span>
+            </span>
+            <span class="sc-text"><span class="sc-name">ホルモジ</span><span class="sc-desc">黄色／緑で強調・中央</span></span>
+            <span class="sc-check" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+          </label>
+          <label class="style-card">
+            <input type="radio" name="preset" value="clean">
+            <span class="mock mock-clean" aria-hidden="true">
+              <span class="m-person dim"><span class="m-head"></span><span class="m-body"></span></span>
+              <span class="m-sub">never give up today</span>
+            </span>
+            <span class="sc-text"><span class="sc-name">シンプル</span><span class="sc-desc">下に控えめ</span></span>
+            <span class="sc-check" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="group">
+        <legend class="g-title">フォント</legend>
+        <div class="fonts" id="fonts" role="radiogroup" aria-label="フォント">
+          <!-- filled from /api/fonts; static fallback below -->
+          <label class="font-opt"><input type="radio" name="font" value="montserrat" checked><span class="f-sample" style="font-family:'KC Montserrat';font-weight:900">NEVER GIVE UP</span><span class="f-name">Montserrat</span></label>
+          <label class="font-opt"><input type="radio" name="font" value="anton"><span class="f-sample" style="font-family:'KC Anton'">NEVER GIVE UP</span><span class="f-name">Anton</span></label>
+          <label class="font-opt"><input type="radio" name="font" value="bebas"><span class="f-sample" style="font-family:'KC Bebas Neue'">NEVER GIVE UP</span><span class="f-name">Bebas Neue</span></label>
+          <label class="font-opt"><input type="radio" name="font" value="courgette"><span class="f-sample" style="font-family:'KC Courgette'">Never give up</span><span class="f-name">Courgette（筆記体）</span></label>
+        </div>
+        <div class="font-add">
+          <label class="fa-label" for="font-query">Google Fonts から追加</label>
+          <div class="fa-row">
+            <input id="font-query" class="fa-input" type="text" autocomplete="off" spellcheck="false"
+                   placeholder="フォント名・URL・埋め込みコードを貼り付け" aria-describedby="font-add-help font-add-msg">
+            <button type="button" class="btn ghost" id="font-add-btn">
+              <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>追加
+            </button>
+          </div>
+          <p class="fa-help" id="font-add-help">
+            <a href="https://fonts.google.com/" target="_blank" rel="noopener">fonts.google.com</a>
+            で好きなフォントを開き、そのページのURLか「Get embed code」のコードをそのまま貼り付けてください。例：Pacifico
+          </p>
+          <p class="fa-msg" id="font-add-msg" role="status" aria-live="polite"></p>
+        </div>
+      </fieldset>
+
+      <details class="advanced" id="advanced">
+        <summary><svg class="ic" aria-hidden="true"><use href="#i-sliders"/></svg><span>詳細設定</span><span class="adv-note">おまかせでOK</span><svg class="ic chev" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+        <div class="adv-body">
+          <p class="hint" id="type-hint">ファイルを選ぶと、種類に合わせた設定だけが表示されます。</p>
+
+          <div class="row two">
+            <div class="field">
+              <label for="text_color" class="f-label">文字色</label>
+              <div class="color-field">
+                <input type="color" id="text_color" name="text_color" value="#ffffff">
+                <span class="color-hex" id="text_color_hex">#FFFFFF</span>
+              </div>
+            </div>
+            <div class="field">
+              <span class="f-label" id="accent-label">強調色</span>
+              <div class="color-field">
+                <label class="switch"><input type="checkbox" id="accent_auto" checked aria-describedby="accent-label"><span class="track" aria-hidden="true"></span><span>おまかせ</span></label>
+                <input type="color" id="accent_color" name="accent_color" value="#facc15" disabled aria-labelledby="accent-label">
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="size" class="f-label">文字サイズ <output id="size_out" for="size">1.0×</output></label>
+            <input type="range" id="size" name="size" min="0.6" max="1.6" step="0.1" value="1.0">
+            <div class="range-ends" aria-hidden="true"><span>小さめ</span><span>大きめ</span></div>
+          </div>
+
+          <fieldset class="field">
+            <legend class="f-label">位置</legend>
+            <div class="seg">
+              <label><input type="radio" name="position" value="auto" checked><span>おまかせ（自動）</span></label>
+              <label><input type="radio" name="position" value="top"><span>上</span></label>
+              <label><input type="radio" name="position" value="center"><span>中央</span></label>
+              <label><input type="radio" name="position" value="bottom"><span>下</span></label>
+            </div>
+          </fieldset>
+
+          <div class="field" data-only="video" hidden>
+            <label class="switch wide"><input type="checkbox" id="behind" name="behind" checked><span class="track" aria-hidden="true"></span><span>頭の後ろに回り込ませる</span></label>
+            <p class="hint">大きな文字が人物の後ろに隠れるように配置します。</p>
+          </div>
+
+          <fieldset class="field" data-only="video" hidden>
+            <legend class="f-label">背景</legend>
+            <div class="seg">
+              <label><input type="radio" name="bg_video" value="keep" checked><span>そのまま</span></label>
+              <label><input type="radio" name="bg_video" value="black"><span>黒で人物だけ</span></label>
+            </div>
+          </fieldset>
+
+          <fieldset class="field" data-only="audio" hidden>
+            <legend class="f-label">背景</legend>
+            <div class="seg">
+              <label><input type="radio" name="bg_audio" value="black" checked><span>黒</span></label>
+              <label><input type="radio" name="bg_audio" value="white"><span>白</span></label>
+              <label><input type="radio" name="bg_audio" value="custom"><span>好きな色</span></label>
+            </div>
+            <div class="color-field" id="bg_custom_wrap" hidden>
+              <input type="color" id="bg_custom" value="#1e1b4b" aria-label="背景の色">
+              <span class="color-hex" id="bg_custom_hex">#1E1B4B</span>
+            </div>
+          </fieldset>
+
+          <fieldset class="field" data-only="audio" hidden>
+            <legend class="f-label">画面比率</legend>
+            <div class="seg aspects">
+              <label><input type="radio" name="canvas" value="9:16" checked><span><i class="ar" style="--w:9;--h:16"></i>9:16 縦</span></label>
+              <label><input type="radio" name="canvas" value="16:9"><span><i class="ar" style="--w:16;--h:9"></i>16:9 横</span></label>
+              <label><input type="radio" name="canvas" value="1:1"><span><i class="ar" style="--w:1;--h:1"></i>1:1</span></label>
+              <label><input type="radio" name="canvas" value="4:5"><span><i class="ar" style="--w:4;--h:5"></i>4:5</span></label>
+            </div>
+          </fieldset>
+
+          <fieldset class="field">
+            <legend class="f-label">言語</legend>
+            <div class="seg">
+              <label><input type="radio" name="language" value="" checked><span>自動</span></label>
+              <label><input type="radio" name="language" value="en"><span>英語</span></label>
+              <label><input type="radio" name="language" value="ja"><span>日本語</span></label>
+            </div>
+          </fieldset>
+
+          <fieldset class="field">
+            <legend class="f-label">精度</legend>
+            <div class="seg">
+              <label><input type="radio" name="model" value="base"><span>速い</span></label>
+              <label><input type="radio" name="model" value="small" checked><span>標準</span></label>
+              <label><input type="radio" name="model" value="large-v3"><span>高精度</span></label>
+            </div>
+            <p class="hint">高精度は時間がかかります。文字おこしの間違いが多いときに。</p>
+          </fieldset>
+
+          <button type="button" class="btn ghost sm" id="reset">初期設定に戻す</button>
+        </div>
+      </details>
+
+      <div class="cta-bar">
+        <button type="submit" class="btn primary cta" id="cta" disabled aria-describedby="cta-hint">
+          <svg class="ic" aria-hidden="true"><use href="#i-wand"/></svg><span id="cta-label">字幕動画を作る</span>
+        </button>
+        <p class="hint center" id="cta-hint">まずはファイルを選んでください</p>
+      </div>
+    </form>
+  </section>
+</main>
+
+<div class="sr-only" aria-live="polite" id="announce"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
